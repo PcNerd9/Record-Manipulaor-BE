@@ -56,7 +56,7 @@ class RedisSettings(BaseSettings):
     
     @computed_field
     @property
-    def REDIS_CACHE_URI(self) -> str:
+    def REDIS_URI(self) -> str:
         if self.REDIS_URL:
             return self.REDIS_URL
         return f"redis://{self.REDIS_HOST}:{self.REDIS_POST}"
