@@ -133,3 +133,4 @@ def generate_otp(length: int) -> str:
     digits = string.digits
     
     return "".join(secrets.choice(digits) for _ in range(length))
+

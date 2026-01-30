@@ -17,6 +17,7 @@ class CryptSettings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    OTP_EXPIRY_TIME: int = 30
     
     
 class LoggerSettings(BaseSettings):
@@ -80,6 +81,15 @@ class CORSSettings(BaseSettings):
     CORS_METHODS: list[str] = ["*"]
     CORS_HEADERS: list[str] = ["*"]
 
+class EmailSettings(BaseSettings):
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    SMTP_PORT: int = 465
+    SMTP_HOST: str ="smtp.gmail.com"
+    SMTP_USER: str = "johdoe@gmail.com"
+    SMTP_PASSWORD: SecretStr = SecretStr("my-app-password")
+    EMAILS_FROM_EMAIL: str ="johndoe@gmail.com"
+    EMAILS_FROM_NAME: str ="John Doe"
 
 class Settings(
     AppSettings,
@@ -89,7 +99,8 @@ class Settings(
     LoggerSettings,
     DefaultRateLimitSettings,
     EnvironmentSettings,
-    CORSSettings
+    CORSSettings,
+    EmailSettings
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(
