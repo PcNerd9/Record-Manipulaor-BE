@@ -1,0 +1,110 @@
+from pydantic import SecretStr, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from enum import Enum
+import os
+
+
+
+class AppSettings(BaseSettings):
+    APP_NAME: str = "Record Manipulator"
+    APP_DESCRIPTON: str | None = None
+    APP_VERSION: str | None = None
+    
+    
+    
+class CryptSettings(BaseSettings):
+    SECRET_KEY: SecretStr = SecretStr('secret-key')
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    
+class LoggerSettings(BaseSettings):
+    CONSOLE_LOG_LEVEL: str = "INFO"
+    CONSOLE_LOG_FORMAT_JSON: bool = False
+    
+    # Include request ID, Path, Method, client host and status code in the console log
+    INCLUDE_REQUEST_ID: bool = False
+    INCLUDE_PATH: bool = False
+    INCLUDE_METHOD: bool = False
+    INLCLUDE_CLIENT_HOST: bool = False
+    INCLUDE_STATUS_CODE: bool = False
+    
+class DatabaseSettings(BaseSettings):
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "postgres"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_NAME: str = "postgres"
+    DB_PREFIX: str = "postgresql+asyncpg://"
+    DB_URL: str | None = None
+    
+    @computed_field
+    @property
+    def DB_URI(self) -> str:
+        if self.DB_URL:
+            return self.DB_URL
+        credentials = f"{self.DB_USER}:{self.DB_PASSWORD}"
+        location = f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        
+        return f"{credentials}@{location}"
+    
+class RedisSettings(BaseSettings):
+    REDIS_HOST: str = "localhost"
+    REDIS_POST: int = 6379
+    REDIS_URL: str | None = None
+    
+    @computed_field
+    @property
+    def REDIS_CACHE_URI(self) -> str:
+        if self.REDIS_URL:
+            return self.REDIS_URL
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_POST}"
+    
+    
+class DefaultRateLimitSettings(BaseSettings):
+    DEFAULT_RATE_LIMIT_LIMIT: int = 10
+    DEFAULT_RATE_LIMIT_PERIOD: int = 3600
+    
+    
+class EnvironmentOption(str, Enum):
+    LOCAL = "local"
+    STAGING = "staging"
+    PRODUCTION = "production"
+    
+class EnvironmentSettings(BaseSettings):
+    ENVIRONMENT: EnvironmentOption = EnvironmentOption.LOCAL
+    
+class CORSSettings(BaseSettings):
+    CORS_ORIGINS: list[str] = ["*"]
+    CORS_METHODS: list[str] = ["*"]
+    CORS_HEADERS: list[str] = ["*"]
+
+
+class Settings(
+    AppSettings,
+    DatabaseSettings,
+    CryptSettings,
+    RedisSettings,
+    LoggerSettings,
+    DefaultRateLimitSettings,
+    EnvironmentSettings,
+    CORSSettings
+):
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "..",
+            "..",
+            ".env"
+        ),
+        env_file_encoding="uft-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
+    
+
+settings = Settings()
+
+    
+    
