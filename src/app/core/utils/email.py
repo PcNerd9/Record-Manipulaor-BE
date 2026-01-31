@@ -58,11 +58,11 @@ async def send_email(
         logger.error("❌email not sent", email=email_to, subject=subject)
         return False
 
-async def send_otp_verification_email(email_to: str, firt_name: str, otp_code: str) -> None:
+async def send_otp_verification_email(email_to: str, first_name: str, otp_code: str) -> None:
     
     template = "otp_verification.html"
     context = {
-        "user_name": firt_name,
+        "user_name": first_name,
         "otp_code": otp_code,
         "expiry_minutes": settings.OTP_EXPIRY_TIME,
         "year": datetime.now(timezone.utc).year

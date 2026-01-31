@@ -5,6 +5,7 @@ from enum import Enum
 from datetime import timedelta, datetime, timezone
 from typing import Any
 import secrets, string
+from fastapi.responses import Response
 
 from app.core.redis import get_redis
 from app.core.config import settings
@@ -49,21 +50,22 @@ def create_access_token(
 def create_refresh_token(
     sub: str,
     expires_delta: timedelta | None = None
-) -> str:    
+) -> tuple[str, str]:    
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     
     expire_timestamp = int(expire.timestamp())
+    jti = str(uuid4())
     to_encode = {
         "sub": sub, 
         "exp": expire_timestamp, 
         "token_type": TokenType.REFRESH, 
-        "jti": str(uuid4())
+        "jti": jti
     }
     
-    return jwt.encode(to_encode, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM)
+    return jwt.encode(to_encode, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM), jti
 
 def compute_blacklist_key(id: str) -> str:
     return f"blacklisted:{id}"
@@ -133,4 +135,20 @@ def generate_otp(length: int) -> str:
     digits = string.digits
     
     return "".join(secrets.choice(digits) for _ in range(length))
+
+def set_cookeies(response: Response, key: str, value: str, max_age: int) -> None:
+    if settings.ENVIRONMENT == "production":
+        response.set_cookie(
+            key=key,
+            value=value,
+            max_age=max_age,
+            httponly=True,
+            samesite="lax",
+            secure=True
+        )
+    else:
+        response.set_cookie(
+            key=key, value=value, max_age=max_age, path="/auth", httponly=True
+        )
+
 
