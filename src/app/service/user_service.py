@@ -3,9 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import BackgroundTasks, status
 from datetime import datetime, timezone
 
-from app.crud.crud_user import crud_users
 from app.core.exceptions.http_exceptions import DuplicateValueException, NotFoundException, ForbiddenException
-from app.schemas.user import UserCreate, UserCreateInternals, UserUpdate, UserRead
 from app.model.user import OTPType, User
 from app.core.security import generate_otp, hash_password
 from app.core.utils.email import send_otp_verification_email
@@ -13,29 +11,27 @@ from app.core.response import response_builder
 
 
 class UserService:
-    async def create_user(self, user_data: UserCreate, db: AsyncSession, background_task: BackgroundTasks) -> dict[str, Any]:
+    async def create_user(self, user_data: dict[str, Any], db: AsyncSession, background_task: BackgroundTasks) -> dict[str, Any]:
         
-        email_row = await crud_users.exists(db=db, email=user_data.email)
-        if email_row:
+        user = await User.get_by_unique(key="email", value=user_data["email"], db=db)
+        if user:
             raise DuplicateValueException("Email is already registerd")
         
-        user_internal_dict = user_data.model_dump()
-        user_internal_dict["password"] = hash_password(user_data.password.get_secret_value())
+        user_data["password"] = hash_password(user_data["password"].get_secret_value())
         
         otp = generate_otp(6)
-        user_internal_dict["otp"] = hash_password(otp)
-        user_internal_dict["otp_expiry"] = datetime.now(timezone.utc)
-        user_internal_dict["otp_type"] = OTPType.EMAIL_VERIFICATION
-        
-        user_internal = UserCreateInternals(**user_internal_dict)
-        created_user = await crud_users.create(db=db, object=user_internal, schema_to_select=UserRead)
+        user_data["otp"] = hash_password(otp)
+        user_data["otp_expiry"] = datetime.now(timezone.utc)
+        user_data["otp_type"] = OTPType.EMAIL_VERIFICATION
+  
+        created_user = await User.create(data=user_data, db=db)
         
         #send email
         background_task.add_task(
             send_otp_verification_email,
-            email_to=created_user["email"],
-            first_name=created_user["first_name"],
-            otp_code=created_user["otp"]
+            email_to=created_user.email,
+            first_name=created_user.first_name,
+            otp_code=otp
         )
         
         return response_builder(
@@ -45,7 +41,12 @@ class UserService:
         )
         
     async def current_user(self, user: User) -> dict[str, Any]:
-        pass
+        return response_builder(
+            status_code=status.HTTP_200_OK,
+            status="success",
+            message="successfully fetch current user",
+            data=user.to_dict()
+        )
     
     
 user_service = UserService()

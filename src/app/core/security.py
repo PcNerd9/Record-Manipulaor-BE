@@ -6,6 +6,7 @@ from datetime import timedelta, datetime, timezone
 from typing import Any
 import secrets, string
 from fastapi.responses import Response
+import hmac, hashlib
 
 from app.core.redis import get_redis
 from app.core.config import settings
@@ -101,6 +102,16 @@ async def verify_token(token, expected_token_type: TokenType) -> dict[str, Any] 
     except JWTError: 
         return None
     
+
+def hash_token(token) -> str:
+    return hmac.new(
+        settings.SECRET_KEY.get_secret_value().encode(), token.encode(), hashlib.sha256
+    ).hexdigest()
+    
+def verify_hash_token(token: str, hashed_token: str) -> bool:
+    new_hash_token = hash_token(token)
+    return new_hash_token == hashed_token
+
     
 async def blacklist_token(token: str) -> bool:
     redis_client = await get_redis()
@@ -151,4 +162,18 @@ def set_cookeies(response: Response, key: str, value: str, max_age: int) -> None
             key=key, value=value, max_age=max_age, path="/auth", httponly=True
         )
 
+def delete_cookies(response: Response, key: str) -> None:
+    if settings.ENVIRONMENT == "production":
+        response.delete_cookie(
+            key=key,
+            httponly=True,
+            samesite="lax",
+            secure=True
+        )
+    else:
+        response.delete_cookie(
+            key=key,
+            path="/auth",
+            httponly=True
+        )
 
