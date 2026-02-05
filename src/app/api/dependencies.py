@@ -1,6 +1,6 @@
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
+from fastapi import Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.db.database import async_get_db
@@ -11,6 +11,7 @@ from app.model.user import User
 http_bearer = HTTPBearer()
 
 
+fileDep = Annotated[UploadFile, File(...)]
 tokenDep = Annotated[HTTPAuthorizationCredentials, Depends(http_bearer)]
 dbDepSession = Annotated[AsyncSession, Depends(async_get_db)]
 

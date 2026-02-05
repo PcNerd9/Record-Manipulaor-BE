@@ -12,10 +12,9 @@ class Base(DeclarativeBase, MappedAsDataclass):
 DATABASE_URI = settings.DB_URI
 DATABASE_PREFIX = settings.DB_PREFIX
 
-DATABASE_URL = f"{DATABASE_PREFIX}{DATABASE_URI}"
 
 async_engine = create_async_engine(
-    url=DATABASE_URL,
+    url=DATABASE_URI,
     future=True
 )
 

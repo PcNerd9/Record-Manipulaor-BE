@@ -13,6 +13,7 @@ from app.core.response import response_builder
 class UserService:
     async def create_user(self, user_data: dict[str, Any], db: AsyncSession, background_task: BackgroundTasks) -> dict[str, Any]:
         
+        user_data["email"] = user_data["email"].lower()
         user = await User.get_by_unique(key="email", value=user_data["email"], db=db)
         if user:
             raise DuplicateValueException("Email is already registerd")

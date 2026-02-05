@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, func, select, and_, or_
+from sqlalchemy import String, DateTime, Boolean, func, select, and_, or_
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,8 @@ class BaseModel(Base):
     id: Mapped[UUID_pkg] = mapped_column(UUID(as_uuid=True), primary_key=True, nullable=False, default=uuid4, init=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False, init=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False, init=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, init=False)
+    
     
     @classmethod
     async def create(cls, data: dict[str, Any], db: AsyncSession) -> Self:
@@ -83,80 +85,90 @@ class BaseModel(Base):
         db: AsyncSession
     ) -> Self | None:
         
+        
         if hasattr(cls, key):
             column = getattr(cls, key)
-            result = await db.execute(select(column == value))
+            result = await db.execute(select(cls).where(column == value))
             return result.scalar_one_or_none()
         
         return None
-        
-        
-        result = await db.execute(stmt)
-        
-        return result.scalar_one_or_none()
+    
     
     @classmethod
     async def get_by(
         cls,
         db: AsyncSession,
-        filter: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
         page: int = 1,
         page_size: int = 10,
-        all: bool = False,
-        is_active: bool = True
+        fetch_all: bool = False,
+        is_active: bool = True,
+        orderby: str | None = None
     ) -> dict[str, Any]:
-        
-        query = select(cls)
-        or_condition = []
-        
-        if filter:
-            for key, value in filter.items():
-                if hasattr(cls, key):
-                    column = getattr(cls, key)
-                    if isinstance(value, str) and "%" in value:
-                        or_condition.append(column.ilike(value))
-                    elif value is None:
-                        or_condition.append(column.is_(None))
-                    else:
-                        or_condition.append(column == value)
-        
-        if or_condition:               
-            if is_active and hasattr(cls, "is_active"):
-                query = query.filter(
-                    and_(
-                        cls.is_active.is_(True), 
-                        or_(*or_condition)
-                    )
-                )
-            else:
-                query = query.where(or_(*or_condition))
-        
-        # Set page and page size if invalid input
-        if page < 0:
-            page = 1
-        
-        if page_size <= 0:
-            page_size = 10
-            
-        offset = (page - 1) * page_size
-        
-        if not all:
-            query = query.offset(offset).limit(page_size)
-        
-        count_query = select(func.count()).select_from(query.subquery())
+
+        base_query = select(cls)
+        conditions = []
+
+        if filters:
+            for key, value in filters.items():
+                if not hasattr(cls, key):
+                    continue
+
+                column = getattr(cls, key)
+
+                if isinstance(value, str) and "%" in value:
+                    conditions.append(column.ilike(value))
+                elif value is None:
+                    conditions.append(column.is_(None))
+                else:
+                    conditions.append(column == value)
+
+
+        if is_active and hasattr(cls, "is_active"):
+            conditions.append(cls.is_active.is_(True))
+
+        if conditions:
+            base_query = base_query.where(and_(*conditions))
+
+
+        if orderby:
+            desc = orderby.startswith("-")
+            field = orderby[1:] if desc else orderby
+
+            if hasattr(cls, field):
+                column = getattr(cls, field)
+                base_query = base_query.order_by(column.desc() if desc else column.asc())
+
+        count_query = select(func.count()).select_from(base_query.subquery())
         count_result = await db.execute(count_query)
-        
-        result = await db.execute(query)
+        total_count = count_result.scalar() or 0
+
+    
+        if page < 1:
+            page = 1
+
+        if page_size < 1:
+            page_size = 10
+
+        if page_size > 100:
+            page_size = 100   # hard cap
+
+        if not fetch_all:
+            offset = (page - 1) * page_size
+            base_query = base_query.offset(offset).limit(page_size)
+
+
+        result = await db.execute(base_query)
         result_data = result.scalars().all()
-        count = count_result.scalar() or 0
-        
-        return_data = {
+
+
+        response = {
             "data": result_data,
-            "count": count
+            "count": total_count
         }
-        
-        if not all:
-            return_data["page"] = page
-            return_data["page_size"] = page_size
-        
-        return return_data
+
+        if not fetch_all:
+            response["page"] = page
+            response["page_size"] = page_size
+
+        return response

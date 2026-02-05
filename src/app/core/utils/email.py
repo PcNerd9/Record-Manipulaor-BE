@@ -34,7 +34,7 @@ conf = ConnectionConfig(
 
 def render_email_templates(*, template_name: str, context: dict[str, Any]) -> str:
     template_str = (
-        Path(__file__).parent.parent.parent / "email_template" / "build" / template_name
+        Path(__file__).parent.parent.parent / "email_templates" / "build" / template_name
     ).read_text()
     
     html_content = Template(template_str).render(context)

@@ -17,7 +17,7 @@ auth = APIRouter(
 )
 
 @auth.post(
-    "/",
+    "/create-user",
     summary="Create a new user",
     status_code=status.HTTP_201_CREATED,
     response_model=BaseResponse

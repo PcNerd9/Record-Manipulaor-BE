@@ -1,4 +1,4 @@
-from pydantic import SecretStr, computed_field
+from pydantic import SecretStr, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 import os
@@ -7,8 +7,10 @@ import os
 
 class AppSettings(BaseSettings):
     APP_NAME: str = "Record Manipulator"
-    APP_DESCRIPTON: str | None = None
-    APP_VERSION: str | None = None
+    APP_DESCRIPTON: str = "This is a Record Manipulator api"
+    APP_VERSION: str = "1.0.0"
+    API_BASE: str = "/api/v1"
+    PORT: int = 8000
     
     
     
@@ -47,8 +49,8 @@ class DatabaseSettings(BaseSettings):
             return self.DB_URL
         credentials = f"{self.DB_USER}:{self.DB_PASSWORD}"
         location = f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        
-        return f"{credentials}@{location}"
+
+        return f"{self.DB_PREFIX}{credentials}@{location}"
     
 class RedisSettings(BaseSettings):
     REDIS_HOST: str = "localhost"
@@ -80,7 +82,17 @@ class CORSSettings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
     CORS_METHODS: list[str] = ["*"]
     CORS_HEADERS: list[str] = ["*"]
-
+    
+    @field_validator("CORS_ORIGINS", "CORS_METHODS", "CORS_HEADERS", mode="before")
+    @classmethod
+    def split_str(cls, v):
+        if isinstance(v, str):
+            if v == "*":
+                return ["*"]
+            return [item.strip() for item in v.split(",")]
+        
+        return v
+    
 class EmailSettings(BaseSettings):
     SMTP_TLS: bool = True
     SMTP_SSL: bool = False
@@ -109,7 +121,7 @@ class Settings(
             "..",
             ".env"
         ),
-        env_file_encoding="uft-8",
+        env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore"
     )

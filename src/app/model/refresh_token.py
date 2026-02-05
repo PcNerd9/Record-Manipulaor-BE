@@ -27,11 +27,11 @@ class RefreshToken(BaseModel):
     jti: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False, init=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_used: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, init=False)
+    last_used: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, init=False)
     
     user: Mapped["User"] = relationship(
-        back_populates="refresh_tokens", uselist=False
+        back_populates="refresh_tokens", uselist=False, init=False
     )
     
     @classmethod
