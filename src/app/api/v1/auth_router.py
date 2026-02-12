@@ -4,7 +4,16 @@ from fastapi.responses import Response
 
 from app.api.dependencies import dbDepSession, currentUser
 
-from app.schemas.auth_schema import LoginUser, RegenerateOTP, EmailVerification, LoginUserResponse, RefreshTokenResponse
+from app.schemas.auth_schema import (
+    LoginUser, 
+    RegenerateOTP, 
+    EmailVerification, 
+    ForgotPassword,
+    ResetPassword,
+    VerifyForgotPasswordResponse,
+    LoginUserResponse, 
+    RefreshTokenResponse
+)
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.base_response import BaseResponse
 
@@ -64,7 +73,7 @@ async def resend_otp(
     otp_data: RegenerateOTP,
     background_task: BackgroundTasks
 ):
-    return await auth_service.resend_email_verification_otp(otp_data.email, db, background_task=background_task)
+    return await auth_service.resend_otp(otp_data.email, db, background_task=background_task)
 
 @auth.post(
     "/verify-email",
@@ -77,6 +86,55 @@ async def verify_email(
     email_data: EmailVerification,
 ):
     return await auth_service.verify_email(email_data.email, email_data.otp, db)
+
+@auth.post(
+    "/forgot-password",
+    summary="Initialize forgot password proccess",
+    response_model=BaseResponse,
+    status_code=status.HTTP_200_OK
+)
+async def forgot_password(
+    db: dbDepSession,
+    forgot_password_data: ForgotPassword,
+    background_task: BackgroundTasks
+):
+    return await auth_service.forgot_password(forgot_password_data.email, db, background_task)
+
+@auth.post(
+    "/verify-forgot-password",
+    summary="Verify otp sent to email for forgot password",
+    response_model=VerifyForgotPasswordResponse,
+    status_code=status.HTTP_200_OK
+)
+async def verify_forgot_password(
+    db: dbDepSession,
+    email_data: EmailVerification,
+):
+    return await auth_service.verify_forgot_password_otp(
+        email=email_data.email,
+        otp=email_data.otp,
+        db=db
+    )
+    
+@auth.put(
+    "/reset-password",
+    summary="Reset user password",
+    response_model=BaseResponse,
+    status_code=status.HTTP_200_OK
+)
+async def reset_password(
+    db: dbDepSession,
+    reset_password_data: ResetPassword,
+    user: currentUser,
+    request: Request
+):
+    return await auth_service.reset_password(
+        password=reset_password_data.password,
+        db=db,
+        user=user,
+        request=request
+    )
+    
 
 @auth.post(
     "/refresh",

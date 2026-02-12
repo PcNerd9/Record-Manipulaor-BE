@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from jinja2 import Template
 
 from app.core.config import settings
@@ -45,7 +45,7 @@ async def send_email(
 ) -> bool:
     
     message = MessageSchema(
-        subject=subject, recipients=[email_to], body=html_content, subtype="html"
+        subject=subject, recipients=[email_to], body=html_content, subtype=MessageType.html
     )
     
     
@@ -59,10 +59,8 @@ async def send_email(
         logger.error("❌email not sent", email=email_to, subject=subject, error=str(e))
         return False
   
-
-async def send_otp_verification_email(email_to: str, first_name: str, otp_code: str) -> None:
-    
-    template = "otp_verification.html"
+  
+async def send_otp(email_to: str, first_name: str, otp_code: str, template: str) -> None:
     context = {
         "user_name": first_name,
         "otp_code": otp_code,
@@ -76,3 +74,20 @@ async def send_otp_verification_email(email_to: str, first_name: str, otp_code: 
         subject="Email Verification",
         html_content=html_content
     )
+    
+async def send_otp_verification_email(email_to: str, first_name: str, otp_code: str) -> None:
+    
+    template = "otp_verification.html"
+    
+    await send_otp(email_to=email_to, first_name=first_name, otp_code=otp_code, template=template)
+    
+    
+    
+async def send_otp_forgot_password(email_to: str, first_name: str, otp_code: str) -> None:
+    template = "forgot_password.html"
+
+    await send_otp(email_to=email_to, first_name=first_name, otp_code=otp_code, template=template)
+    
+    
+    
+    

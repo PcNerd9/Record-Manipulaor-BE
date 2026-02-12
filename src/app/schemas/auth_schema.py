@@ -10,6 +10,12 @@ class LoginUser(BaseModel):
 class RegenerateOTP(BaseModel):
     email: Annotated[EmailStr, Field(description="User email", examples=["johndoe@example.com"])]
     
+class ForgotPassword(RegenerateOTP):
+    ...
+    
+class ResetPassword(BaseModel):
+    password: Annotated[SecretStr, Field(description="User new password", examples=["johndoepwd"])]
+    
 class EmailVerification(BaseModel):
     email: Annotated[EmailStr, Field(description="User email", examples=["johndoe@example.com"])]
     otp: Annotated[str, Field(description="User otp", examples=["093232!"])]
@@ -26,3 +32,6 @@ class RefreshTokenResponseSchema(BaseModel):
     
 class RefreshTokenResponse(BaseResponse):
     data: Annotated[RefreshTokenResponseSchema, Field(description="User new access token")]
+    
+class VerifyForgotPasswordResponse(RefreshTokenResponse):
+    ...

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.model.dataset import Dataset
 class OTPType(Enum):
     EMAIL_VERIFICATION = "email_verification"
+    FORGOT_PASSWORD = "forgot_password"
 
 class User(BaseModel):
     __tablename__ = "users"

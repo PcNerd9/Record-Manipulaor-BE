@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 from uuid import uuid4
 from datetime import datetime, timezone, timedelta
+from pydantic import SecretStr
 
 from app.model.user import User, OTPType
 from app.model.refresh_token import RefreshToken
@@ -12,7 +13,7 @@ from app.core.security import create_access_token, create_refresh_token, set_coo
 from app.core.response import response_builder
 from app.core.exceptions.http_exceptions import NotFoundException, UnauthorizedException, BadRequestException
 from app.core.config import settings
-from app.core.utils.email import send_otp_verification_email
+from app.core.utils.email import send_otp_verification_email, send_otp_forgot_password
 from app.core.security import hash_password, generate_otp, verify_token, TokenType, blacklist_token, delete_cookies
 
 class AuthService:
@@ -82,7 +83,7 @@ class AuthService:
         )
         
     
-    async def resend_email_verification_otp(
+    async def resend_otp(
         self,
         email: str,
         db: AsyncSession,
@@ -97,7 +98,6 @@ class AuthService:
         hashed_otp = hash_password(otp)
         user.otp = hashed_otp
         
-        user.otp_type = OTPType.EMAIL_VERIFICATION
         user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_TIME)
         await user.save(db)
         
@@ -114,21 +114,21 @@ class AuthService:
             message="Email is sent successfully"
         ) 
         
-    async def verify_email(self, email: str, otp: str, db: AsyncSession) -> dict[str, Any]:
+    async def _verify_otp(self, email: str, otp: str, db: AsyncSession, otp_type: OTPType) -> User:
         user = await User.get_by_unique(key="email", value=email.lower(), db=db)
-        print(email.lower())
+    
         if not user:
             raise NotFoundException("Email not registered")
         
         if (
             not user.otp 
             or not user.otp_expiry 
-            or user.otp_expiry >= datetime.now(timezone.utc)
+            or user.otp_expiry <= datetime.now(timezone.utc)
             or not user.otp_type
-            or user.otp_type != OTPType.EMAIL_VERIFICATION
+            or user.otp_type != otp_type
         ):
             raise BadRequestException("Invalid otp")
-
+    
         if not verify_pasword(otp, user.otp):
             raise UnauthorizedException("Invalid otp")
         
@@ -139,10 +139,109 @@ class AuthService:
         user.is_verified = True
         await user.save(db)
         
+        return user
+    
+    async def verify_email(self, email: str, otp: str, db: AsyncSession) -> dict[str, Any]:
+        
+        await self._verify_otp(
+            email=email,
+            otp=otp,
+            db=db,
+            otp_type=OTPType.EMAIL_VERIFICATION
+        )
+        
         return response_builder(
             status_code=status.HTTP_200_OK,
             status="succcess",
             message="Email verified successfully"
+        )
+        
+        
+    async def forgot_password(
+        self,
+        email: str,
+        db: AsyncSession,
+        background_task: BackgroundTasks
+    ):
+        
+        user = await User.get_by_unique(key="email", value=email.lower(), db=db)
+        if not user:
+            raise NotFoundException("Email not registered")
+        
+        otp = generate_otp(6)
+        hashed_otp = hash_password(otp)
+        
+        user.otp = hashed_otp
+        user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_TIME)
+        user.otp_type = OTPType.FORGOT_PASSWORD
+        await user.save(db)
+        
+        background_task.add_task(
+            send_otp_forgot_password,
+            email_to=user.email,
+            first_name=user.first_name,
+            otp_code=otp
+        )
+        
+        return response_builder(
+            status_code=status.HTTP_200_OK,
+            status="success",
+            message="Otp code has been sent to this email"
+        )
+        
+        
+    async def verify_forgot_password_otp(
+        self,
+        email: str,
+        otp: str,
+        db: AsyncSession
+    ):
+        user = await self._verify_otp(
+            email=email,
+            otp=otp,
+            db=db,
+            otp_type=OTPType.FORGOT_PASSWORD
+        )
+        
+        # Generate a temporary token to be use to reset password
+        temp_token = create_access_token(sub=str(user.id))
+        
+        return response_builder(
+            status_code=status.HTTP_200_OK,
+            status="success",
+            message="forgot password otp verified successfully",
+            data={
+                "access_token": temp_token
+            }
+        )
+        
+    
+    async def reset_password(
+        self,
+        password: SecretStr,
+        db: AsyncSession,
+        user: User,
+        request: Request
+    ) -> dict[str, Any]:
+        
+        # Retrieve token from request header
+        auth_token = request.headers.get("Authorization")
+        if not auth_token or not auth_token.startswith("Bearer "):
+            raise UnauthorizedException("Invalid authorization header")
+        
+        auth_token = auth_token.split(" ")[1]
+        
+        hashed_password = hash_password(password.get_secret_value())
+        user.password = hashed_password
+        await user.save(db)
+        
+        # Black list token, so as to force user to login with the new password
+        await blacklist_token(auth_token)
+        
+        return response_builder(
+            status_code=status.HTTP_200_OK,
+            status="success",
+            message="Password reset successfully"
         )
         
     async def logout(
