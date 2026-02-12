@@ -1,11 +1,12 @@
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import BackgroundTasks, status
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.core.exceptions.http_exceptions import ConflictException
 from app.model.user import OTPType, User
 from app.core.security import generate_otp, hash_password
+from app.core.config import settings
 from app.core.utils.email import send_otp_verification_email
 from app.core.response import response_builder
 
@@ -22,7 +23,7 @@ class UserService:
         
         otp = generate_otp(6)
         user_data["otp"] = hash_password(otp)
-        user_data["otp_expiry"] = datetime.now(timezone.utc)
+        user_data["otp_expiry"] = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_TIME)
         user_data["otp_type"] = OTPType.EMAIL_VERIFICATION
   
         created_user = await User.create(data=user_data, db=db)
