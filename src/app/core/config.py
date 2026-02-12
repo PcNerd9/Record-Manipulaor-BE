@@ -11,7 +11,7 @@ class AppSettings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     API_BASE: str = "/api/v1"
     PORT: int = 8000
-    
+    APP_URL: str = "http://localhost:8000"
     
     
 class CryptSettings(BaseSettings):
@@ -102,6 +102,14 @@ class EmailSettings(BaseSettings):
     SMTP_PASSWORD: SecretStr = SecretStr("my-app-password")
     EMAILS_FROM_EMAIL: str ="johndoe@gmail.com"
     EMAILS_FROM_NAME: str ="John Doe"
+    
+
+class QStashToken(BaseSettings):
+    QSTASH_TOKEN: str = ""
+    QSTASH_API_KEY: str = ""
+    QSTASH_URL: str = ""
+    QSTASH_CURRENT_SIGNING_KEY: str = ""
+    QSTASH_NEXT_SIGNING_KEY: str = ""
 
 class Settings(
     AppSettings,
@@ -112,7 +120,8 @@ class Settings(
     DefaultRateLimitSettings,
     EnvironmentSettings,
     CORSSettings,
-    EmailSettings
+    EmailSettings,
+    QStashToken
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(

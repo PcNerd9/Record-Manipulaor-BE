@@ -10,7 +10,7 @@ class FileValidationError(Exception):
     pass
 
 class DatasetRepository:
-    MAX_FILE_SIZE_MB = 20
+    MAX_FILE_SIZE_MB = 50
     MAX_ROWS =  500_000
     MAX_COLUMNS = 300
 
@@ -130,6 +130,20 @@ class DatasetRepository:
 
         return normalized
     
+    async def vailidate_file(self, file: UploadFile):
+        """Only performs basic file validation like file size and file type
+        """
+        ext = self._validate_basic_metadata(file)
+        if ext not in [".csv", ".xls", ".xlsx"]:
+            raise FileValidationError("File type not supported")
+        
+        file_bytes = await file.read()
+        
+        self._validate_size(file_bytes)
+        
+        
+        
+        
     async def validate_and_parse_upload(self, file: UploadFile) -> pd.DataFrame:
         """
         Validates and parses CSV or Excel upload.

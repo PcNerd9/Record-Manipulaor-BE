@@ -28,7 +28,6 @@ class DatasetService():
 
         try:
             df = await dataset_repository.validate_and_parse_upload(file)
-            
         except FileValidationError as e:
             raise BadRequestException(str(e))
         
@@ -65,6 +64,18 @@ class DatasetService():
             message="successfully upload",
             data=dataset_response
         )
+        
+    async def create_dataset_in_background(
+        self,
+        db: AsyncSession,
+        file: UploadFile,
+        user_id: UUID,
+    ) -> dict[str, Any]:
+        
+        await dataset_repository.vailidate_file(file)
+        
+        
+        
     
     # Get all dateset  for user
     async def get_dataset_by_user(
