@@ -2,9 +2,11 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 from sqlalchemy.ext.asyncio.session import AsyncSession
+import structlog
 
 from app.core.config import settings
 
+logger = structlog.get_logger(__name__)
 
 class Base(DeclarativeBase, MappedAsDataclass):
     pass
@@ -29,3 +31,6 @@ async_session = async_sessionmaker(
 async def async_get_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:
         yield session
+        await session.commit()
+      
+            

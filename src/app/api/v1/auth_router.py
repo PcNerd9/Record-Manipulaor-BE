@@ -17,7 +17,7 @@ auth = APIRouter(
 )
 
 @auth.post(
-    "/create-user",
+    "/register",
     summary="Create a new user",
     status_code=status.HTTP_201_CREATED,
     response_model=BaseResponse
@@ -79,19 +79,17 @@ async def verify_email(
     return await auth_service.verify_email(email_data.email, email_data.otp, db)
 
 @auth.post(
-    "/refresh-token",
+    "/refresh",
     summary="Get a new access token using your refresh token",
     response_model=RefreshTokenResponse,
     status_code=status.HTTP_200_OK
 )
 async def refresh_token(
-    user: currentUser,
     request: Request,
     response: Response,
     db: dbDepSession
 ):
     return await auth_service.refresh_token(
-        user,
         request,
         response,
         db
@@ -110,3 +108,15 @@ async def logout_user(
     db: dbDepSession
 ):
     return await auth_service.logout(user, request, db, response)
+
+
+@auth.get(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    description="get current logged in user"
+)
+async def get_current_user(
+    user: currentUser
+):
+    return await user_service.current_user(user)

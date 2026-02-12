@@ -1,11 +1,12 @@
 from __future__ import annotations
-from sqlalchemy import String, ForeignKey, insert, Index, select, and_
+from sqlalchemy import String, ForeignKey, insert, Index, select, and_, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uuid import uuid4, UUID as UUID_PKG
 from typing import Any, TYPE_CHECKING, Self, Sequence
+import math
 
 from app.model.basemodel import BaseModel
 
@@ -69,22 +70,71 @@ class Record(BaseModel):
     @classmethod
     async def filter_records(
         cls,
-        key: str,
-        value: str,
         db: AsyncSession,
         dataset_id: str,
-        limit: int = 100
-    ) -> Sequence[Self]:
+        key: str | None = None,
+        value: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+        sort_by: str | None = None,
+        sort_order: str = "asc"
+    ) -> dict[str, Any]:
         
-        smt = (
-            select(cls)
-            .where(
-                and_(
-                    Record.dataset_id == dataset_id,
-                    Record.data[key].astext == value
-                )
-            ).limit(limit)
-        )
+        query = select(cls)
+        count_qeuery = select(func.count()).select_from(cls)
         
-        result = await db.execute(smt)
-        return result.scalars().all()
+        page = max(1, page)
+        page_size = max(1, page_size)
+        
+        offset = ( page - 1) * page_size
+        
+        if key and value:
+            and_condition = and_(
+                        cls.dataset_id == dataset_id,
+                        cls.data[key].astext.ilike(f"%{value}%")
+                    )
+            query = (
+                query
+                .where(
+                    and_condition
+                )     
+            )
+            
+            count_qeuery = count_qeuery.where(and_condition)
+        
+        if sort_by:
+            sort_column = cls.data[sort_by].astext
+            print(sort_by)
+            print(sort_column)
+            if sort_order.lower() == "desc":
+                query = query.order_by(sort_column.desc(), cls.id.desc())
+            else:
+                query = query.order_by(sort_column.asc(), cls.id.asc())
+
+        else:
+            query = query.order_by(cls.created_at.desc(), cls.id.desc())
+            
+        
+        query = query.limit(page_size).offset(offset)
+                
+        
+        
+        count_result = await db.execute(count_qeuery)
+        count = count_result.scalar() or 0
+        
+        result = await db.execute(query)
+        records = result.scalars().all()
+        
+        total_page = math.ceil(count / page_size)
+        
+        return {
+            "records": records,
+            "meta": {
+                "page": page,
+                "page_size": page_size,
+                "total": count,
+                "total_page": total_page,
+                "has_next_page": total_page > page,
+                "has_prev_page": page < 1
+            }
+        }

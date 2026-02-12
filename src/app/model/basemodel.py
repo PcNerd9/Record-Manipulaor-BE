@@ -3,7 +3,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
-from typing import Any, Self
+from typing import Any, Self, Sequence
+import math
 
 from uuid import uuid4, UUID as UUID_pkg
 from datetime import datetime
@@ -38,6 +39,14 @@ class BaseModel(Base):
         await db.flush()
         await db.refresh(self)
         return self
+    
+    @classmethod
+    async def bulk_save(cls, models: list | Sequence, db: AsyncSession):
+        try:
+            db.add_all(models);
+        except Exception:
+            await db.rollback()
+            raise e
     
     def to_dict(self) -> dict[str, Any]:
         
@@ -103,7 +112,7 @@ class BaseModel(Base):
         page_size: int = 10,
         fetch_all: bool = False,
         is_active: bool = True,
-        orderby: str | None = None
+        orderby: str | list[str] | None = None
     ) -> dict[str, Any]:
 
         base_query = select(cls)
@@ -132,12 +141,16 @@ class BaseModel(Base):
 
 
         if orderby:
-            desc = orderby.startswith("-")
-            field = orderby[1:] if desc else orderby
+            if isinstance(orderby, str):
+                orderby = [orderby]
+            
+            for field_expr in orderby:
+                desc = field_expr.startswith("-")
+                field = field_expr[1:] if desc else field_expr
 
-            if hasattr(cls, field):
-                column = getattr(cls, field)
-                base_query = base_query.order_by(column.desc() if desc else column.asc())
+                if hasattr(cls, field):
+                    column = getattr(cls, field)
+                    base_query = base_query.order_by(column.desc() if desc else column.asc())
 
         count_query = select(func.count()).select_from(base_query.subquery())
         count_result = await db.execute(count_query)
@@ -161,14 +174,31 @@ class BaseModel(Base):
         result = await db.execute(base_query)
         result_data = result.scalars().all()
 
+        total_page = math.ceil(total_count / page_size)
+        has_next_page = page < total_page
+        has_prev_page = page > 1
 
-        response = {
-            "data": result_data,
-            "count": total_count
+        response: dict[str, Any] = {
+            "data": result_data
+        }
+        response["meta"] = {
+            "total": total_count
         }
 
         if not fetch_all:
-            response["page"] = page
-            response["page_size"] = page_size
+            response["meta"]["page"] = page
+            response["meta"]["page_size"] = page_size
+            response["meta"]["total_page"] = total_page
+            response["meta"]["has_next_page"] = has_next_page
+            response["meta"]["has_prev_page"] = has_prev_page
+            
 
         return response
+    
+    
+    @classmethod
+    async def bulk_get_by_ids(cls, ids: list[str], db: AsyncSession) -> Sequence[Self]:
+        stmt = select(cls).where(cls.id.in_(ids))
+        
+        result = await db.execute(stmt)
+        return result.scalars().all()

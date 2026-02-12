@@ -4,5 +4,5 @@ def is_valid_uuid(id: str) -> bool:
     try:
         obj_value = UUID(id)
         return str(obj_value) == id.lower()
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, Exception):
         return False

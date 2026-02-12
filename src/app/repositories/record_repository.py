@@ -12,6 +12,7 @@ class RecordRepository:
     ) -> tuple[bool, str | None]:
         
         payload_keys = set(payload.keys())
+        print(payload)
         schema_keys = set(dataset_schema.keys())
 
         # -------- Missing fields -------- #

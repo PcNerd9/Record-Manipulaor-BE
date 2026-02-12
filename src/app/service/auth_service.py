@@ -17,7 +17,7 @@ from app.core.security import hash_password, generate_otp, verify_token, TokenTy
 
 class AuthService:
     async def login_user(self, login_data: dict[str, Any], db: AsyncSession, request: Request, response: Response) -> dict[str, Any]:
-        user = await User.get_by_unique(key="email", value=login_data["email"], db=db)
+        user = await User.get_by_unique(key="email", value=login_data["email"].lower(), db=db)
         if not user:
             raise UnauthorizedException("User Not Found")
         
@@ -46,7 +46,8 @@ class AuthService:
         token = await RefreshToken.get_token_by_user_and_device_id(str(user.id), new_device_id, db)
         if token:
             await token.revoke(db)
-            
+        
+        
         await RefreshToken.create_refresh_token(
             user_id=str(user.id),
             token=hashed_refresh_token,
@@ -57,7 +58,7 @@ class AuthService:
             expires_at=expires_at,
             db=db
         )
-        
+
         max_age = int(expires_at.timestamp())
         
         if not device_id:
@@ -65,6 +66,7 @@ class AuthService:
                 response, "device_id", new_device_id, max_age=31536000
             ) # Setting the device_id cookie to 1 year
             
+
         set_cookeies(response, "refresh_token", refresh_token, max_age)
         
         user_data = user.to_dict()
@@ -87,7 +89,7 @@ class AuthService:
         background_task: BackgroundTasks
     ) -> dict[str, Any]:
         
-        user = await User.get_by_unique(key="email", value=email, db=db)
+        user = await User.get_by_unique(key="email", value=email.lower(), db=db)
         if not user:
             raise NotFoundException("Email has not been registered")
         
@@ -113,7 +115,8 @@ class AuthService:
         ) 
         
     async def verify_email(self, email: str, otp: str, db: AsyncSession) -> dict[str, Any]:
-        user = await User.get_by_unique(key="email", value=email, db=db)
+        user = await User.get_by_unique(key="email", value=email.lower(), db=db)
+        print(email.lower())
         if not user:
             raise NotFoundException("Email not registered")
         
@@ -183,7 +186,6 @@ class AuthService:
         
     async def refresh_token(
         self,
-        user: User,
         request: Request,
         response: Response,
         db: AsyncSession
@@ -202,8 +204,20 @@ class AuthService:
             raise UnauthorizedException("Invalid refresh token")
         
         jti = refresh_token_payload.get("jti")
+        user_id = refresh_token_payload.get("sub")
+        type = refresh_token_payload.get("type")
         
-        token = await RefreshToken.get_token_by_user_and_device_id(str(user.id), device_id, db)
+        if not user_id:
+            raise UnauthorizedException("Invalid refresh token")
+        
+        if not type or type != TokenType.REFRESH:
+            raise UnauthorizedException("Invalid token Type")
+        
+        user = await User.get_by_id(user_id, db)
+        if not user:
+            raise UnauthorizedException("Could not validate credentials")
+        
+        token = await RefreshToken.get_token_by_user_and_device_id(user_id, device_id, db)
         if not token:
             raise BadRequestException("No Session for this device")
         

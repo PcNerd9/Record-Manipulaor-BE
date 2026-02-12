@@ -8,6 +8,7 @@ from app.model.basemodel import BaseModel
 
 if TYPE_CHECKING:
     from app.model.refresh_token import RefreshToken
+    from app.model.dataset import Dataset
 class OTPType(Enum):
     EMAIL_VERIFICATION = "email_verification"
 
@@ -29,4 +30,8 @@ class User(BaseModel):
     
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin", init=False
+    )
+    
+    datasets: Mapped[list["Dataset"]] = relationship(
+        "Dataset", back_populates="user", lazy="selectin", cascade="all, delete-orphan", init=False
     )

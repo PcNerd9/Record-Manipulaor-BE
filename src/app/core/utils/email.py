@@ -48,15 +48,17 @@ async def send_email(
         subject=subject, recipients=[email_to], body=html_content, subtype="html"
     )
     
-    fm = FastMail(conf)
+    
     try:
+        fm = FastMail(conf)
         logger.info("📧sending email", email=email_to, subject=subject)
         await fm.send_message(message)
         logger.info("✅email sent", email=email_to, subject=subject)
         return True
-    except smtplib.SMTPException as e:
-        logger.error("❌email not sent", email=email_to, subject=subject)
+    except Exception as e:
+        logger.error("❌email not sent", email=email_to, subject=subject, error=str(e))
         return False
+  
 
 async def send_otp_verification_email(email_to: str, first_name: str, otp_code: str) -> None:
     

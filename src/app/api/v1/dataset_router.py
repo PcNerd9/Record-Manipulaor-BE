@@ -3,19 +3,19 @@ from fastapi import APIRouter, status, UploadFile, Query
 from app.api.dependencies import dbDepSession, ActiveCurrentUser, fileDep
 from app.service.dataset_service import dataset_service
 from app.service.record_service import record_service
-from app.schemas.dataset_schema import DatasetResponse, DatasetPaginatedResponse, BaseResponse
-from app.schemas.record_schema import RecordCreate, RecordResponse, RecordPaginatedRespone, RecordUpdate, RecordListResponse
+from app.schemas.dataset_schema import DatasetResponse, DatasetPaginatedResponse, DatasetUploadResponse, UpdateDataset
+from app.schemas.record_schema import RecordCreate, RecordResponse, RecordPaginatedRespone, RecordUpdate, RecordListResponse, ListBatchUpdate
 
 
 
 dataset = APIRouter(
-    prefix="/dataset",
+    prefix="/datasets",
     tags=["Dataset"]
 )
 
 @dataset.post(
     "/upload",
-    response_model=DatasetResponse,
+    response_model=DatasetUploadResponse,
     status_code=status.HTTP_201_CREATED,
     description="Upload Dataset file. supported format are .csv, .xls and .xlxs"
 )
@@ -67,7 +67,7 @@ async def export_dataset(
     user: ActiveCurrentUser,
     format: str | None = Query(default="csv", description="The format to export as", examples=["csv", "xlxs"])
 ):
-    await dataset_service.export_dataset(id, db, user)
+    return await dataset_service.export_dataset(id, db, user)
     
 
 @dataset.get(
@@ -81,7 +81,7 @@ async def get_all_record_for_dataset(
     id: str,
     db: dbDepSession,
     user: ActiveCurrentUser,
-    page: int = Query(default=1, ge=1, le=1, examples=["2"], description="The current page to fetch"),
+    page: int = Query(default=1, ge=1, examples=["2"], description="The current page to fetch"),
     page_size: int = Query(default=10, ge=1, examples=["50"], description="Number of resource to fetch per page")
 ):
     return await record_service.get_records_for_dataset(id, user, db, page, page_size)
@@ -89,7 +89,7 @@ async def get_all_record_for_dataset(
 
 @dataset.get(
     "/{id}/records/filter",
-    response_model=RecordListResponse,
+    response_model=RecordPaginatedRespone,
     status_code=status.HTTP_200_OK,
     description="Filter records by using column"
 )
@@ -97,11 +97,22 @@ async def filter_rows_by_column(
     id: str,
     db: dbDepSession,
     user: ActiveCurrentUser,
-    key: str = Query(description="Name of the column to filter by"),
-    value: str = Query(description="Value of the column for filtering"),
-    limit: int = Query(default=100, ge=1, description="Number of records to fetch")
+    key: str | None = Query(default=None, description="Name of the column to filter by"),
+    value: str | None = Query(default=None, description="Value of the column for filtering"),
+    sort: str | None = Query(default=None, description="Column to sort by"),
+    page_size: int = Query(default=100, ge=1, description="Number of records to fetch"),
+    page: int = Query(default=1, ge=1, description="Number of records to fetch")
 ):
-    return await record_service.filter_record_by_column(id, key, value, db, user, limit)
+    return await record_service.filter_record_by_column(
+        dataset_id=id, 
+        key=key, 
+        value=value,
+        db=db,
+        user=user, 
+        page_size=page_size, 
+        page=page,
+        sort_by=sort
+    )
 
 @dataset.get(
     "/{id}",
@@ -118,6 +129,25 @@ async def get_dataset_by_id(
 
 
 @dataset.put(
+    "/{id}/records/batch",
+    response_model=RecordListResponse,
+    status_code=status.HTTP_200_OK,
+    description="Update records in bulk"
+)
+async def batch_update_records(
+    id: str,
+    updates: ListBatchUpdate,
+    user: ActiveCurrentUser,
+    db: dbDepSession    
+):
+    update_dicts = [update.model_dump() for update in updates.records]
+    return await record_service.batch_update(
+        update_dicts, id, db, user
+    )
+    
+
+
+@dataset.put(
     "/records/{record_id}",
     response_model=RecordResponse,
     status_code=status.HTTP_200_OK,
@@ -131,18 +161,32 @@ async def update_record(
 ):
     return await record_service.update_record(record_id, record_data.model_dump(), db, user)
 
+@dataset.put(
+    "/{id}",
+    response_model=DatasetResponse,
+    status_code=status.HTTP_200_OK,
+    description="Update dataset name"
+)
+async def update_dataset(
+    id: str,
+    dataset_data: UpdateDataset,
+    db: dbDepSession,
+    user: ActiveCurrentUser
+):
+    return await dataset_service.update_dataset(id, dataset_data.name, db, user)
 
 @dataset.delete(
-    "/record/{record_id}",
+    "/{id}/records/{record_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     description="Delete a record"
 )
 async def delete_record(
+    id: str,
     record_id: str,
     user: ActiveCurrentUser,
     db: dbDepSession
 ):
-    return await record_service.delete_record(record_id, user, db)
+    return await record_service.delete_record(id, record_id, user, db)
 
 
 @dataset.delete(

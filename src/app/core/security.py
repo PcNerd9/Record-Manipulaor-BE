@@ -42,7 +42,7 @@ def create_access_token(
     to_encode = {
         "sub": sub, 
         "exp": expire_timestamp, 
-        "token_type": TokenType.ACCESS, 
+        "type": TokenType.ACCESS, 
         "jti": str(uuid4())
     }
     
@@ -62,7 +62,7 @@ def create_refresh_token(
     to_encode = {
         "sub": sub, 
         "exp": expire_timestamp, 
-        "token_type": TokenType.REFRESH, 
+        "type": TokenType.REFRESH, 
         "jti": jti
     }
     
@@ -84,8 +84,8 @@ async def verify_token(token, expected_token_type: TokenType) -> dict[str, Any] 
         )
         
         jti = payload.get("jti")
-        token_type = payload.get("token_type")
-        
+        token_type = payload.get("type")
+
         if token_type != expected_token_type or not jti:
             return None
         
@@ -159,7 +159,7 @@ def set_cookeies(response: Response, key: str, value: str, max_age: int) -> None
         )
     else:
         response.set_cookie(
-            key=key, value=value, max_age=max_age, path="/auth", httponly=True
+            key=key, value=value, max_age=max_age, path="/", httponly=True
         )
 
 def delete_cookies(response: Response, key: str) -> None:
@@ -173,7 +173,7 @@ def delete_cookies(response: Response, key: str) -> None:
     else:
         response.delete_cookie(
             key=key,
-            path="/auth",
+            path="/",
             httponly=True
         )
 

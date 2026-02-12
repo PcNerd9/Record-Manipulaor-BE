@@ -63,15 +63,17 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     
-    logger.exception(str(exc))
     
-    message = str(exc) if settings.ENVIRONMENT == "local" else "Internal server Error"
+    logger.error(
+        "Internal Server Error occured", error=str(exc)
+    )
+    
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
             "status": "error",
-            "message": message
+            "message": "Internal Server Error"
         }
     )
     

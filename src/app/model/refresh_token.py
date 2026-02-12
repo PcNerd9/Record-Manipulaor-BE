@@ -20,15 +20,14 @@ class RefreshToken(BaseModel):
     user_id: Mapped[UUID_PKG] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
     token: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    session_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    device_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    device_id: Mapped[str] = mapped_column(String, nullable=False)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     user_agent: Mapped[str] = mapped_column(String, nullable=False)
     jti: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False, init=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, init=False)
-    last_used: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, init=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     
     user: Mapped["User"] = relationship(
         back_populates="refresh_tokens", uselist=False, init=False
@@ -73,7 +72,6 @@ class RefreshToken(BaseModel):
                 "jti": jti,
                 "ip_address": ip_address,
                 "expires_at": expires_at,
-                "issued_at": datetime.now(timezone.utc),
                 "last_used": datetime.now(timezone.utc)
             }, 
             db

@@ -42,7 +42,9 @@ class DatasetService():
         data = {
             "user_id": user_id,
             "name": file.filename,
-            "data_schema": schema
+            "data_schema": schema,
+            "row_count": len(df),
+            "column_count": len(list(df.columns))
         }
         dataset = await Dataset.create(data, db)
 
@@ -52,6 +54,7 @@ class DatasetService():
         
         dataset_response = {
             "dataset_id": str(dataset.id),
+            "dataset_name": dataset.name,
             "rows": len(df),
             "columns": list(df.columns)
         }
@@ -84,9 +87,7 @@ class DatasetService():
         
         response_data = {
             "datasets": datasets_dict,
-            "page": datasets["page"],
-            "page_size": datasets["page_size"],
-            "total": datasets["count"]
+            "meta": datasets["meta"]
         }  
         
         return response_builder(
@@ -109,6 +110,7 @@ class DatasetService():
         dataset = await Dataset.get_by_id(id=id, db=db)
         if not dataset:
             raise NotFoundException("Dataset not found")
+        
         if dataset.user_id != user.id:
             raise ForbiddenException("Can only view your dataset")
         
@@ -119,6 +121,35 @@ class DatasetService():
             data=dataset.to_dict()
         )
     
+    # update dataset name
+    async def update_dataset(
+        self,
+        id: str,
+        name: str,
+        db: AsyncSession,
+        user: User
+    ):
+        if not is_valid_uuid(id):
+            raise BadRequestException("Invalid Id")
+        
+        dataset = await Dataset.get_by_id(id=id, db=db)
+        
+        if not dataset:
+            raise NotFoundException("Dataset not found")
+        
+        if dataset.user_id != user.id:
+            raise ForbiddenException("Dataset not yours")
+        
+        await dataset.update({"name": name}, db)
+        
+        return response_builder(
+            status_code=status.HTTP_200_OK,
+            status="success",
+            message="successfully rename dataset",
+            data=dataset.to_dict()
+        )
+        
+        
     # delete dataset
     async def delete_dataset(
         self,

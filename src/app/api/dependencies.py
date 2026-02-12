@@ -39,7 +39,7 @@ currentUser = Annotated[User, Depends(get_current_user)]
 async def get_active_current_user(
     user: currentUser
 ):
-    if not user.is_active or not user.is_deleted:
+    if not user.is_active or  user.is_deleted:
         raise ForbiddenException("Account has been suspended")
     
     return user

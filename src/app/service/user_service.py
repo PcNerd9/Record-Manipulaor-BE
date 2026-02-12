@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import BackgroundTasks, status
 from datetime import datetime, timezone
 
-from app.core.exceptions.http_exceptions import DuplicateValueException, NotFoundException, ForbiddenException
+from app.core.exceptions.http_exceptions import ConflictException
 from app.model.user import OTPType, User
 from app.core.security import generate_otp, hash_password
 from app.core.utils.email import send_otp_verification_email
@@ -16,7 +16,7 @@ class UserService:
         user_data["email"] = user_data["email"].lower()
         user = await User.get_by_unique(key="email", value=user_data["email"], db=db)
         if user:
-            raise DuplicateValueException("Email is already registerd")
+            raise ConflictException("Email is already registerd")
         
         user_data["password"] = hash_password(user_data["password"].get_secret_value())
         
