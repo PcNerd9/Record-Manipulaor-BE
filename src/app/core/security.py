@@ -154,7 +154,7 @@ def set_cookeies(response: Response, key: str, value: str, max_age: int) -> None
             value=value,
             max_age=max_age,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=True
         )
     else:
@@ -167,7 +167,7 @@ def delete_cookies(response: Response, key: str) -> None:
         response.delete_cookie(
             key=key,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=True
         )
     else:
